@@ -11,7 +11,8 @@ WITH ranked AS (
             PARTITION BY artist_id
             ORDER BY
                 CASE WHEN artist_location IS NOT NULL AND artist_location <> '' THEN 0 ELSE 1 END,
-                CASE WHEN artist_latitude IS NOT NULL THEN 0 ELSE 1 END
+                CASE WHEN artist_latitude IS NOT NULL THEN 0 ELSE 1 END,
+                artist_name ASC, artist_location ASC, artist_latitude ASC, artist_longitude ASC   -- deterministic tie-break
         ) AS rn
     FROM iceberg.raw.songs
     WHERE artist_id IS NOT NULL

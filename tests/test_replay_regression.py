@@ -44,7 +44,6 @@ def test_latest_state_after_in_order_load(pipeline):
     assert user["last_seen_at"].startswith("2018-11-03 12:00:00")
 
 
-@pytest.mark.xfail(strict=True, reason="CONFIRMED BUG: unconditional MERGE lets an older interval overwrite newer users rows")
 @pytest.mark.parametrize("replayed", [A, B])
 def test_replaying_older_interval_does_not_regress_current_state(pipeline, replayed):
     load_all(pipeline)
@@ -60,7 +59,6 @@ def test_replaying_older_interval_does_not_regress_current_state(pipeline, repla
     assert after["session_facts"] == before["session_facts"]
 
 
-@pytest.mark.xfail(strict=True, reason="CONFIRMED BUG: same cause, out-of-order first load ends with stale user state")
 def test_out_of_order_first_load_converges_to_in_order_state(pipeline, spark):
     for interval in (C, A, B):                        # C arrives first, then older data
         pipeline.load_interval(interval, LOGS[interval], SONGS)
@@ -77,7 +75,6 @@ def _tie_logs(order):
     return [r1, r2] if order == "r1r2" else [r2, r1]
 
 
-@pytest.mark.xfail(strict=True, reason="CONFIRMED BUG: users.sql ROW_NUMBER() ties are broken by input order")
 def test_identical_timestamps_resolve_deterministically_within_a_batch(pipeline, spark):
     results = []
     for order in ("r1r2", "r2r1"):

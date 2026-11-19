@@ -40,18 +40,24 @@ TABLES = [
         "table": "users",
         "partition_keys": [],
         "upsert_keys": ["user_id"],
+        # Mutable attributes with an event time: only a row at least as recent as the stored one may update it,
+        # so replaying an older interval cannot overwrite newer state.
+        "version_column": "last_seen_at",
         "depends_on": [],
     },
     {
         "table": "artists",
         "partition_keys": [],
         "upsert_keys": ["artist_id"],
+        # Descriptive catalog attributes without a timestamp: an incoming NULL never erases a known value.
+        "keep_existing_when_null": True,
         "depends_on": [],
     },
     {
         "table": "songs",
         "partition_keys": [],
         "upsert_keys": ["song_id"],
+        "keep_existing_when_null": True,
         "depends_on": ["artists"],
     },
     {

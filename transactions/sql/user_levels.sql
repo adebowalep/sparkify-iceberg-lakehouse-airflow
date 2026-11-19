@@ -29,7 +29,7 @@ initial_seed AS (
             level                        AS new_level,
             ROW_NUMBER() OVER (
                 PARTITION BY userid
-                ORDER BY ts ASC
+                ORDER BY ts ASC, sessionid ASC, iteminsession ASC
             ) AS rn
         FROM iceberg.raw.logs
         WHERE userid IS NOT NULL

@@ -11,7 +11,7 @@ WITH ranked AS (
         CAST(ts / 1000 AS TIMESTAMP) AS event_ts,
         ROW_NUMBER() OVER (
             PARTITION BY userid
-            ORDER BY ts DESC
+            ORDER BY ts DESC, sessionid DESC, iteminsession DESC   -- total order: ties never depend on row order
         ) AS rn
     FROM iceberg.raw.logs
     WHERE userid IS NOT NULL

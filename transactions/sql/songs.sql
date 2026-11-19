@@ -9,7 +9,7 @@ WITH ranked AS (
         CASE WHEN year = 0 THEN NULL ELSE year END AS year,
         ROW_NUMBER() OVER (
             PARTITION BY song_id
-            ORDER BY year DESC
+            ORDER BY year DESC, title ASC, artist_id ASC   -- deterministic tie-break
         ) AS rn
     FROM iceberg.raw.songs
     WHERE song_id IS NOT NULL
