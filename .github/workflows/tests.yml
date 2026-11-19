@@ -1,0 +1,58 @@
+name: tests
+
+# Local, no-cost checks only: no AWS credentials, no Glue jobs, no deployment.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-orchestration:
+    name: Static checks + Airflow DAG tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies (Airflow constraints, Spark pin kept at the Glue 5.0 version)
+        run: |
+          curl -sL https://raw.githubusercontent.com/apache/airflow/constraints-3.0.6/constraints-3.11.txt \
+            | grep -viE '^(pyspark|py4j)==' > constraints.txt
+          pip install -r requirements-dev.txt -c constraints.txt
+      - name: Byte-compile every Python file
+        run: python -m compileall -q setup raw transactions analytics tests
+      - name: Airflow DAG import, asset wiring and interval-selection tests
+        run: python -m pytest tests/test_orchestration.py -q
+
+  spark-iceberg:
+    name: Spark + Iceberg transformation tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          curl -sL https://raw.githubusercontent.com/apache/airflow/constraints-3.0.6/constraints-3.11.txt \
+            | grep -viE '^(pyspark|py4j)==' > constraints.txt
+          pip install -r requirements-dev.txt -c constraints.txt
+      - name: Cache the Iceberg runtime jar
+        uses: actions/cache@v4
+        with:
+          path: ~/.ivy2
+          key: ivy-iceberg-spark-runtime-3.5_2.12-1.7.1
+      - name: Run the pipeline tests (real Glue scripts + SQL templates on synthetic data)
+        run: python -m pytest tests --ignore=tests/test_orchestration.py -q
