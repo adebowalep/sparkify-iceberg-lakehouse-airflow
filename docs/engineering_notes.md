@@ -58,7 +58,7 @@ thresholds (arbitrary for this data) and more Athena SQL checks (cannot be verif
 |---|---|
 | Verified on AWS (earlier implementation, commit `a432963`) | end-to-end runs of 3 intervals, reruns, schema evolution, new source folder, failure propagation, Athena counts and schemas |
 | Verified locally (pytest, synthetic data) | all behaviour in sections 1-5 |
-| Verified by GitHub Actions | not yet (workflow added, no run recorded) |
+| Verified by GitHub Actions | **not yet.** The first run ([44545740130](https://github.com/adebowalep/sparkify-iceberg-lakehouse-airflow/actions/runs/44545740130), commit `96206cb`) failed at `actions/setup-python` because `cache: pip` had no `cache-dependency-path` for `requirements-dev.txt`; no test step ran. The fix is committed locally, not yet pushed. No successful run exists. |
 | Not verified on AWS | everything changed after `a432963`: events resolution, MERGE conditions, staging checks, DAG interval selection. Expect `transactions.events` resolution counts and downstream `song_facts`/`artist_facts` to differ from the recorded numbers |
 
 ## 7. Local test environment vs AWS

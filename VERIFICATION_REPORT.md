@@ -44,4 +44,4 @@ Everything above was executed on AWS with the implementation at commit `a432963`
 | DAGs read the run's own `triggering_asset_events`; refuse multi-interval runs | `tests/test_orchestration.py` (Airflow DAG tests, no scheduler) | not verified |
 | Source-correction behaviour documented (insert/update only) | `tests/test_source_corrections.py` | not verified |
 
-CI: `.github/workflows/tests.yml` exists; no GitHub Actions run has been recorded yet. Details: `docs/engineering_notes.md`.
+CI: `.github/workflows/tests.yml`. The first GitHub Actions run ([44545740130](https://github.com/adebowalep/sparkify-iceberg-lakehouse-airflow/actions/runs/44545740130), commit `96206cb`) **failed** at `actions/setup-python` (missing `cache-dependency-path`), before any test ran. The fix is committed locally and not yet pushed, so **no successful CI run exists yet**. Details: `docs/engineering_notes.md`.

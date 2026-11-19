@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -15,11 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
+          cache-dependency-path: requirements-dev.txt
       - name: Install dependencies (Airflow constraints, Spark pin kept at the Glue 5.0 version)
         run: |
           curl -sL https://raw.githubusercontent.com/apache/airflow/constraints-3.0.6/constraints-3.11.txt \
@@ -33,26 +39,27 @@ jobs:
   spark-iceberg:
     name: Spark + Iceberg transformation tests
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
+          cache-dependency-path: requirements-dev.txt
       - name: Install dependencies
         run: |
           curl -sL https://raw.githubusercontent.com/apache/airflow/constraints-3.0.6/constraints-3.11.txt \
             | grep -viE '^(pyspark|py4j)==' > constraints.txt
           pip install -r requirements-dev.txt -c constraints.txt
       - name: Cache the Iceberg runtime jar
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.ivy2
           key: ivy-iceberg-spark-runtime-3.5_2.12-1.7.1
       - name: Run the pipeline tests (real Glue scripts + SQL templates on synthetic data)
-        run: python -m pytest tests --ignore=tests/test_orchestration.py -q
+        run: python -m pytest tests --ignore=tests/test_orchestration.py -q --durations=10
