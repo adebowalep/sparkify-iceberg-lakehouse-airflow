@@ -1,0 +1,7 @@
+"data_interval","id","name","note"
+"2026-01-01","1","alpha",
+"2026-01-01","2","beta",
+"2026-01-01","3","gamma",
+"2026-01-02","4","delta","column added later"
+"2026-01-02","5","epsilon","schema evolution test"
+"2026-01-02","6","zeta","third row"
