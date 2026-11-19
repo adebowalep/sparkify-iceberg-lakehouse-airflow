@@ -224,3 +224,9 @@ __marimo__/
 *.zip
 index.py
 CODEOWNERS
+
+# local test tooling
+.pytest_cache/
+
+# unmodified Udacity starter SQL kept locally only (NoDerivs licence: do not publish)
+docs/original_sql/

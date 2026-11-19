@@ -1,0 +1,11 @@
+# Local test dependencies (versions match AWS Glue 5.0: Spark 3.5.4, Iceberg 1.7.x, Python 3.11)
+pyspark==3.5.4
+pytest>=8
+jinja2
+boto3
+# Needed for the DAG import / orchestration tests (use Airflow's constraints file when installing)
+apache-airflow==3.0.6
+apache-airflow-providers-amazon
+apache-airflow-providers-common-sql
+# Optional: a bundled JDK 17 so Spark runs without a system Java (CI uses actions/setup-java instead)
+jdk4py>=17,<18
