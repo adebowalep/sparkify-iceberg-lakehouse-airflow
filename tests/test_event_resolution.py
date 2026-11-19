@@ -22,14 +22,12 @@ STAY_A = song("SA", "Stay", "ARA", "Artist A", 210.0)
 STAY_B = song("SB", "Stay", "ARB", "Artist B", 210.0)
 
 
-@pytest.mark.xfail(strict=True, reason="CONFIRMED BUG: events.sql never filters candidate songs by artist name")
 def test_same_title_by_two_artists_resolves_to_the_playing_artist(pipeline):
     got = resolve(pipeline, [p(1, "Artist A", "Stay", 210.0), p(2, "Artist B", "Stay", 210.0)], [STAY_A, STAY_B])
     assert (got[1]["song_id"], got[1]["artist_id"]) == ("SA", "ARA")
     assert (got[2]["song_id"], got[2]["artist_id"]) == ("SB", "ARB")
 
 
-@pytest.mark.xfail(strict=True, reason="CONFIRMED BUG: events.sql never filters candidate songs by artist name")
 def test_same_title_resolution_feeds_correct_song_and_artist_facts(pipeline):
     resolve(pipeline, [p(1, "Artist A", "Stay", 210.0), p(2, "Artist B", "Stay", 210.0), p(3, "Artist B", "Stay", 210.0)],
             [STAY_A, STAY_B])
@@ -40,7 +38,6 @@ def test_same_title_resolution_feeds_correct_song_and_artist_facts(pipeline):
     assert artists == {"ARA": 1, "ARB": 2}
 
 
-@pytest.mark.xfail(strict=True, reason="CONFIRMED BUG: events.sql never filters candidate songs by artist name")
 def test_unknown_artist_with_a_known_title_stays_unresolved(pipeline):
     got = resolve(pipeline, [p(1, "Nobody", "Stay", 210.0)], [STAY_A, STAY_B])
     assert got[1]["song_id"] is None and got[1]["artist_id"] is None and got[1]["version_id"] is None

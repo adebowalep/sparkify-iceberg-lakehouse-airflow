@@ -46,14 +46,19 @@ resolved AS (
         p.event_date,
         ROW_NUMBER() OVER (
             PARTITION BY p.event_id
-            ORDER BY ABS(sv.duration - p.length) ASC
+            -- closest duration first; exact ties resolve to the lowest version_id / song_id (deterministic)
+            ORDER BY ABS(sv.duration - p.length) ASC NULLS LAST, sv.version_id ASC, s.song_id ASC
         ) AS rn
     FROM plays p
-    LEFT JOIN iceberg.transactions.songs   s
-           ON s.title = p.song_title_raw
-    LEFT JOIN iceberg.transactions.artists a
-           ON a.artist_id   = s.artist_id
-          AND a.artist_name = p.artist_name_raw
+    -- A candidate song must match BOTH the title and the artist who played it. Matching on the title
+    -- alone would attach the play to an unrelated artist's song that happens to share the title.
+    LEFT JOIN (
+        SELECT so.song_id, so.title, so.artist_id, ar.artist_name
+        FROM iceberg.transactions.songs so
+        JOIN iceberg.transactions.artists ar ON ar.artist_id = so.artist_id
+    ) s
+           ON s.title       = p.song_title_raw
+          AND s.artist_name = p.artist_name_raw
     LEFT JOIN iceberg.transactions.song_versions sv
            ON sv.song_id  = s.song_id
           AND ABS(sv.duration - p.length) < 0.01
