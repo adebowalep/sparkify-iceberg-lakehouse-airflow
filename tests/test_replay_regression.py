@@ -89,3 +89,18 @@ def test_same_timestamp_correction_in_later_run_is_applied(pipeline):
     pipeline.load_interval(A, [play(400, ms(1), location="Paris, FR")], SONGS)
     pipeline.load_interval(A, [play(400, ms(1), location="Lyon, FR")], SONGS)
     assert pipeline.rows(USER_SQL)[0]["location"] == "Lyon, FR"
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "KNOWN LIMITATION: the 'initial' level row is derived from the raw intervals loaded so far, so loading a later "
+    "interval before an earlier one leaves an extra 'initial' row (stale seed). Current levels are unaffected."))
+def test_out_of_order_first_load_user_levels_match_in_order_load(pipeline, spark):
+    """The 'initial' level row is derived from the raw intervals loaded so far."""
+    q = ("SELECT user_id, CAST(changed_at AS STRING) changed_at, new_level, source "
+         "FROM iceberg.transactions.user_levels ORDER BY changed_at, source")
+    load_all(pipeline)
+    in_order = pipeline.rows(q)
+    reset_catalog(spark)
+    for interval in (C, A, B):
+        pipeline.load_interval(interval, LOGS[interval], SONGS)
+    assert pipeline.rows(q) == in_order
