@@ -8,3 +8,7 @@ For each of `users, artists, songs, song_versions, user_levels, events`: render 
 Promotion order: `artists -> songs -> song_versions`, `users -> user_levels`, and `events` after `users, songs, artists, song_versions`.
 
 `validate_transactions` runs Athena SQL checks: primary-key uniqueness for every table and an unresolved-`version_id` ratio below 30% for `events`.
+
+**Update rules per table** (declared in `TABLES`): `users` updates only if the incoming `last_seen_at` is not older than the stored one (so replaying an older interval cannot overwrite newer state); `artists` and `songs` never replace a known value with NULL; the other tables use a plain upsert. The Glue job rejects staged data with NULL keys or timestamps in the future. `events.sql` resolves a play to a song only when the **title and the artist name** match.
+
+Limitation: the layer is insert/update only; records removed from a corrected interval are not deleted. See `docs/engineering_notes.md`.

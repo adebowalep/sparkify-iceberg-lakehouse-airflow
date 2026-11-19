@@ -32,3 +32,16 @@ Three provided templates treated millisecond Unix times as seconds (years 50,000
 - AWS temporary credentials in Airflow connections expired during testing (operational, not code). A `raw` run started by hand (`manual`) fails by design; start runs only from `run_pipeline`.
 - The Airflow web UI restarted once and lost its history; pipeline data in S3/Glue was unaffected.
 - `index.py` (Workspace zip helper from the starter) is not a DAG and is excluded from the submission ZIP.
+
+## Changes made after the AWS verification (not re-run on AWS)
+Everything above was executed on AWS with the implementation at commit `a432963`. A later correctness review changed the code; those changes are verified **locally only** (pytest on synthetic data, local Spark/Iceberg) and need an AWS re-run before the numbers above can be claimed for the new code.
+
+| Change | Local verification | AWS |
+|---|---|---|
+| `users` MERGE only updates when incoming `last_seen_at` >= stored; `artists`/`songs` keep known values when incoming is NULL; deterministic tie-breaks | `tests/test_replay_regression.py`, `tests/test_merge_semantics_and_quality.py` | not verified |
+| `events.sql` requires title **and** artist name to match | `tests/test_event_resolution.py` | not verified; resolution counts may change |
+| Glue rejects NULL keys and future timestamps | `tests/test_merge_semantics_and_quality.py` | not verified |
+| DAGs read the run's own `triggering_asset_events`; refuse multi-interval runs | `tests/test_orchestration.py` (Airflow DAG tests, no scheduler) | not verified |
+| Source-correction behaviour documented (insert/update only) | `tests/test_source_corrections.py` | not verified |
+
+CI: `.github/workflows/tests.yml` exists; no GitHub Actions run has been recorded yet. Details: `docs/engineering_notes.md`.

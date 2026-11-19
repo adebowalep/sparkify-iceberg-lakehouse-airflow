@@ -1,5 +1,7 @@
 # Execution evidence (real Athena output, Workspace run)
 
+> All evidence below was produced by the implementation at commit `a432963`. Later commits changed the transactions logic and Airflow interval selection and are verified locally only (see `docs/engineering_notes.md`); do not read this evidence as proof that the newer code ran on AWS.
+
 ## After interval 2026-01-01 (first run) — baseline before rerun
 | Query | Result |
 |---|---|

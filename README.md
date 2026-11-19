@@ -53,6 +53,8 @@ analytics ──► render SQL ► Glue job ► createOrReplace (full snapshot)
 
 ## Results (real Athena output from the Airflow/Glue run)
 
+> These numbers, screenshots and Athena exports come from the implementation at commit `a432963`, executed on AWS. Later commits (see *Correctness review* below) changed the transactions logic and were verified **locally only**; they have not been re-run on AWS, so the recorded `events`/analytics numbers may differ after a re-run.
+
 | Layer | Table | Rows |
 |---|---|---|
 | raw | `logs` (2026-01-01 / 01-02 / 01-03) | 2618 / 2592 / 2560 |
@@ -77,6 +79,43 @@ More evidence: [`VERIFICATION_REPORT.md`](VERIFICATION_REPORT.md), [`docs/eviden
 ## A bug found and fixed in the provided SQL
 `logs.ts` and `registration` are Unix **milliseconds**, but three provided templates passed them to `from_unixtime()` (seconds). Result: `event_date`, `registration` and `changed_at` landed in the year 50,000+ and were stored as strings. The fix (`CAST(x / 1000 AS TIMESTAMP)`) is minimal and documented in [`docs/sql_corrections.md`](docs/sql_corrections.md); row counts did not change and dates are now 2018-10 to 2018-11.
 
+## Correctness review (after the AWS run)
+A later review found and fixed three defects, each reproduced by a failing test first (details and decisions in [`docs/engineering_notes.md`](docs/engineering_notes.md)):
+
+| Defect | Fix |
+|---|---|
+| Re-running or late-loading an **older interval overwrote newer user state** (unconditional `MERGE ... UPDATE SET *`) | Per-table update rules: `users` only updates when the incoming `last_seen_at` is not older; `artists`/`songs` never replace a known value with NULL; deterministic tie-breaks |
+| A play could be attached to **another artist's song with the same title** | `events.sql` now requires title **and** artist name to match; ties resolve deterministically |
+| An Airflow run could read the **newest asset event overall** instead of the one that triggered it (queued runs) | Interval is taken from the run's own `triggering_asset_events`; runs triggered by several intervals fail with a clear message |
+
+Also added: Glue-side checks that reject NULL keys and timestamps in the future (the signature of the earlier milliseconds bug).
+
+## Testing
+`tests/` runs the **real** Glue scripts and SQL templates against synthetic data on local Spark 3.5.4 + Iceberg 1.7.1 (the Glue 5.0 versions), plus Airflow DAG tests. No AWS account is needed.
+
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate
+curl -sL https://raw.githubusercontent.com/apache/airflow/constraints-3.0.6/constraints-3.11.txt | grep -viE '^(pyspark|py4j)==' > /tmp/constraints.txt
+pip install -r requirements-dev.txt -c /tmp/constraints.txt "jdk4py>=17,<18"   # jdk4py only if you have no Java 11/17
+pytest tests/test_orchestration.py     # seconds
+pytest tests                           # about 20 minutes (each pipeline load runs several Spark jobs)
+```
+
+| Verified where | Status |
+|---|---|
+| AWS (Udacity workspace) | original implementation, commit `a432963` (evidence below) |
+| Locally with pytest | all tests in `tests/` pass (see `docs/engineering_notes.md` for the exact scope) |
+| GitHub Actions | workflow in `.github/workflows/tests.yml`; **no run recorded yet** |
+| AWS, after the correctness fixes | **not yet** |
+
+Local runs use a Hadoop Iceberg catalog instead of the Glue Data Catalog and fake the `awsglue` module; Athena SQL and the Airflow scheduler are not exercised.
+
+## Known limitations
+- **Insert/update only transactions layer.** Corrected and new source records are applied; records *removed* from a corrected interval are not deleted from `transactions` (tested and documented; a safe delete would need a `source_interval` column).
+- **Out-of-order first loads.** `user_levels` derives its `initial` row from the raw intervals loaded so far, so loading a later interval before an earlier one leaves an extra `initial` row (current levels are unaffected).
+- **Events resolve against the catalog loaded so far.** A play whose song appears in a later interval stays unresolved until its interval is replayed; the existing check tolerates fewer than 30% unresolved `version_id`.
+- **One interval per run.** Trigger `run_pipeline` once per interval and wait for it to finish.
+
 ## Repository layout
 ```
 setup/                  setup_s3_data (seed landing data) and run_pipeline (manual trigger)
@@ -84,7 +123,9 @@ raw/                    dag.py, glue_script.py, README.md
 transactions/           dag.py, glue_script.py, sql/*.sql, README.md
 analytics/              dag.py, glue_script.py, sql/*.sql, README.md
 lakehouse_infrastructure.yml   CloudFormation: S3 bucket, Glue role + databases, Athena workgroup
-docs/                   evidence log, Athena results, screenshots, SQL correction notes
+tests/                  pytest suite: local Spark/Iceberg pipeline tests + Airflow DAG tests
+.github/workflows/      CI (local tests only; no AWS access)
+docs/                   evidence log, engineering notes, Athena results, screenshots, SQL correction notes
 VERIFICATION_REPORT.md  requirement-by-requirement verification
 ```
 Each DAG has its own README rendered in the Airflow UI through the DAG's `doc_md`.
@@ -102,5 +143,5 @@ Never commit AWS credentials; temporary session tokens expire and must be refres
 ## Credits
 Built as a project in the Udacity Data Engineering program. The project brief, starter code, SQL templates, CloudFormation template and the `setup/` DAGs were provided by Udacity; the Airflow DAGs, Glue scripts, validation checks, fixes and documentation for the raw, transactions and analytics layers are my implementation.
 
-## License
-See [LICENSE.txt](LICENSE.txt).
+## Licensing
+[`LICENSE.txt`](LICENSE.txt) is Udacity's licence for its educational content (Creative Commons BY-NC-ND 4.0 for material marked as such, with further restrictions). Several files here derive from Udacity-provided starter material, and this repository contains completed versions of them. **Whether they may be redistributed publicly has not been established** (see `docs/engineering_notes.md`, section 8). Course datasets are not included. If in doubt, keep the repository private or ask Udacity before publishing.
