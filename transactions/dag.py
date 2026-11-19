@@ -80,6 +80,19 @@ TABLES = [
     },
 ]
 
+def single_interval(events, asset_name):
+    """data_interval carried by the asset events that triggered THIS run (see raw/dag.py for the rationale:
+    `inlet_events[asset][-1]` is the newest event ever, not necessarily the one that started this run)."""
+    intervals = {event.extra["data_interval"] for event in events}
+    if not intervals:
+        raise ValueError(f"No '{asset_name}' asset event triggered this run.")
+    if len(intervals) > 1:
+        raise ValueError(
+            f"This run was triggered by events for several intervals {sorted(intervals)}; "
+            f"run the pipeline one interval at a time.")
+    return intervals.pop()
+
+
 # Initialize a dag
 # - Set the dag id to 'transactions'
 # - Set the schedule so the dag is triggered
@@ -98,17 +111,11 @@ with DAG(
 
     # Pull metadata from triggering asset event
     @task(inlets=[RAW_INGESTION_COMPLETE])
-    def metadata(*, inlet_events, **context) -> dict:
-
-        events = inlet_events[RAW_INGESTION_COMPLETE]
-
-        if not events:
-            raise ValueError("No asset events found.")
-        
-        latest = events[-1]
+    def metadata(*, triggering_asset_events, **context) -> dict:
 
         return {
-            "data_interval" : latest.extra["data_interval"],
+            "data_interval" : single_interval(
+                triggering_asset_events[RAW_INGESTION_COMPLETE], RAW_INGESTION_COMPLETE.name),
         }
 
     # Call the metadata task function and assign the output to a variable

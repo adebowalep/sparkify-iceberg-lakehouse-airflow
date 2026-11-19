@@ -5,3 +5,11 @@
 # the DAG parser from walking version-control internals on every parse cycle.
 .git
 .git/**
+
+# test tooling and local environments are not DAGs
+tests
+tests/**
+.venv
+.venv/**
+docs
+docs/**

@@ -42,6 +42,25 @@ RAW_INGESTION_PENDING = Asset("raw_ingestion_pending")
 # Initialize an Asset to represent completion of raw ingestion
 RAW_INGESTION_COMPLETE = Asset("raw_ingestion_complete")
 
+def single_interval(events, asset_name):
+    """data_interval carried by the asset events that triggered THIS run.
+
+    `inlet_events[asset]` returns every event the asset has ever had, so `[-1]` is the newest event overall,
+    which is not necessarily the one that started this run (queued runs, rapid triggers).
+    `triggering_asset_events` is scoped to the current run, so it always names the right interval.
+    If one run was started by events for different intervals, refuse instead of silently skipping one."""
+    intervals = {event.extra["data_interval"] for event in events}
+    if not intervals:
+        raise ValueError(
+            f"No '{asset_name}' asset event triggered this run. Start the pipeline from run_pipeline; "
+            f"do not trigger this DAG by hand.")
+    if len(intervals) > 1:
+        raise ValueError(
+            f"This run was triggered by events for several intervals {sorted(intervals)}. "
+            f"Trigger run_pipeline for one interval at a time (wait for run_pipeline to finish).")
+    return intervals.pop()
+
+
 # Initialize a DAG 
 # - Set the id to "raw"
 # - Schedule the dag to trigger when the run_pipeline dag completes
@@ -63,14 +82,11 @@ with DAG(
     #   - `s3_bucket` a templated string argument. Renders the s3_bucket name at runtime
     #   - `inlet_events` (context variable used for accessing that tasks's inlet events)
     @task(inlets=[RAW_INGESTION_PENDING])
-    def capture_landing_keys(s3_bucket, *, inlet_events) -> list[str]:
+    def capture_landing_keys(s3_bucket, *, triggering_asset_events) -> list[str]:
 
-        # Pull the data interval value from the
-        # latest inlet Asset events metadata
-        events = inlet_events[RAW_INGESTION_PENDING]
-        if not events:
-            raise ValueError("No raw_ingestion_pending asset events found.")
-        data_interval = events[-1].extra["data_interval"]
+        # Pull the data interval value from the metadata of the Asset event(s) that triggered this run
+        data_interval = single_interval(
+            triggering_asset_events[RAW_INGESTION_PENDING], RAW_INGESTION_PENDING.name)
 
         # Initialize an S3Hook (connection opened at task runtime only)
         hook = S3Hook(aws_conn_id=AWS_CONN_ID)
@@ -198,11 +214,12 @@ with DAG(
     # Define a task that sets `outlets` to the 
     # Asset used to trigger the transactions dag
     @task(inlets=[RAW_INGESTION_PENDING], outlets=[RAW_INGESTION_COMPLETE])
-    def notify_complete(tables, *, inlet_events, outlet_events) -> None:
+    def notify_complete(tables, *, triggering_asset_events, outlet_events) -> None:
 
         # Add data_interval (and the tables that were ingested)
         # to the outlet's metadata
-        data_interval = inlet_events[RAW_INGESTION_PENDING][-1].extra["data_interval"]
+        data_interval = single_interval(
+            triggering_asset_events[RAW_INGESTION_PENDING], RAW_INGESTION_PENDING.name)
         outlet_events[RAW_INGESTION_COMPLETE].extra = {
             "data_interval": data_interval,
             "tables": [key.strip("/").split("/")[-1] for key in tables],
